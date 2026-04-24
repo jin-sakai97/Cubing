@@ -3,6 +3,10 @@ import * as THREE from 'three';
 /**
  * Define the 27 positions of a 3x3x3 Rubik's Cube.
  * We use a fixed constant to prevent mutation during hot reloads or multiple imports.
+ * Standard coordinate system: 
+ * X: -1(Left), 0(Mid), 1(Right)
+ * Y: -1(Down), 0(Mid), 1(Up)
+ * Z: -1(Back), 0(Mid), 1(Front)
  */
 export const INITIAL_POSITIONS: readonly THREE.Vector3[] = Object.freeze([
     new THREE.Vector3(-1, -1, -1), new THREE.Vector3(-1, -1, 0), new THREE.Vector3(-1, -1, 1),
@@ -16,7 +20,7 @@ export const INITIAL_POSITIONS: readonly THREE.Vector3[] = Object.freeze([
     new THREE.Vector3(1, 1, -1),   new THREE.Vector3(1, 1, 0),   new THREE.Vector3(1, 1, 1)
 ]);
 
-// Official WCA (World Cube Association) Standard Colors
+// Official BOY (Standard) Colors
 export const COLORS = {
   U: '#FFFFFF', // Up - White
   D: '#FFD500', // Down - Yellow

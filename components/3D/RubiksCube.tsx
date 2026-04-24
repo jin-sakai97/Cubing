@@ -29,9 +29,31 @@ const easeInOutCubic = (t: number): number => {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 };
 
+// Helper to parse standard notation into internal move format
+const parseNotation = (notation: string) => {
+    const face = notation[0].toUpperCase();
+    const isPrime = notation.includes("'");
+    const isDouble = notation.includes("2");
+    
+    let axis = 'x';
+    let slice = 0;
+    let dir = isPrime ? 1 : -1; // Default clockwise is -1 in our system for R, U, F
+
+    switch(face) {
+        case 'R': axis = 'x'; slice = 1; break;
+        case 'L': axis = 'x'; slice = -1; dir *= -1; break;
+        case 'U': axis = 'y'; slice = 1; break;
+        case 'D': axis = 'y'; slice = -1; dir *= -1; break;
+        case 'F': axis = 'z'; slice = 1; break;
+        case 'B': axis = 'z'; slice = -1; dir *= -1; break;
+        case 'M': axis = 'x'; slice = 0; dir *= 1; break; // Middle slice
+    }
+
+    return { axis, slice, dir, isDouble };
+};
+
 export const RubiksCube = () => {
   const groupRef = useRef<THREE.Group>(null);
-  
   const animationRef = useRef<AnimationState | null>(null);
   
   // Use Global History
@@ -41,6 +63,10 @@ export const RubiksCube = () => {
 
   const mode = useStore(state => state.mode);
   const learnPhase = useStore(state => state.learnPhase);
+  const tutorialSteps = useStore(state => state.tutorialSteps);
+  const currentPhaseIndex = useStore(state => state.currentPhaseIndex);
+  const currentMoveIndex = useStore(state => state.currentMoveIndex);
+
   const selectedColor = useStore(state => state.selectedColor);
   const paintSticker = useStore(state => state.paintSticker);
   const paintedStickers = useStore(state => state.paintedStickers);
@@ -87,14 +113,51 @@ export const RubiksCube = () => {
     }
   }, [mode, learnPhase]);
 
-  // --- 2D CAMERA VIEW FOR INPUT PHASE ---
+  // --- TUTORIAL MOVE EXECUTION ---
+  const lastMoveIndex = useRef(-1);
+  const lastPhaseIndex = useRef(-1);
+
+  useEffect(() => {
+      if (mode !== 'LEARN' || learnPhase !== 'TUTORIAL') return;
+
+      const currentPhase = tutorialSteps[currentPhaseIndex];
+      if (!currentPhase) return;
+
+      const moves = currentPhase.algorithm.split(' ').filter(m => m.length > 0);
+      
+      // Handle Phase Change (Snap to state)
+      if (currentPhaseIndex !== lastPhaseIndex.current) {
+          // In a real implementation, we would simulate the cube up to this phase.
+          // For now, we assume the user is following along.
+          lastPhaseIndex.current = currentPhaseIndex;
+          lastMoveIndex.current = -1; // Reset move tracking for new phase
+      }
+
+      // Handle Move Execution
+      if (currentMoveIndex !== lastMoveIndex.current && currentMoveIndex >= 0) {
+          const moveNotation = moves[currentMoveIndex];
+          if (moveNotation) {
+              const { axis, slice, dir, isDouble } = parseNotation(moveNotation);
+              rotateSlice(axis, slice, dir, 400, false).then(() => {
+                  if (isDouble) {
+                      rotateSlice(axis, slice, dir, 400, false);
+                  }
+              });
+          }
+          lastMoveIndex.current = currentMoveIndex;
+      } else if (currentMoveIndex === -1 && lastMoveIndex.current !== -1) {
+          // Reset or Undo handled here if needed
+          lastMoveIndex.current = -1;
+      }
+  }, [currentMoveIndex, currentPhaseIndex, mode, learnPhase, tutorialSteps]);
+
+
+  // --- CAMERA VIEW CONTROL ---
   useEffect(() => {
       if (mode === 'LEARN' && learnPhase === 'INPUT') {
-          // Force front-facing view
           camera.position.set(0, 0, 12);
           camera.lookAt(0, 0, 0);
           camera.rotation.set(0, 0, 0);
-          
           setOrbitEnabled(false);
           if (controls) {
               // @ts-ignore
@@ -103,13 +166,15 @@ export const RubiksCube = () => {
               controls.reset();
           }
       } else {
-          // Restore 3D view
-          camera.position.set(6, 4.5, 9);
-          camera.lookAt(0, 0, 0);
+          // Re-enable orbit in TUTORIAL and GAME
           setOrbitEnabled(true);
           if (controls) {
               // @ts-ignore
               controls.enabled = true;
+          }
+          if (mode === 'HERO') {
+              camera.position.set(6, 4.5, 9);
+              camera.lookAt(0, 0, 0);
           }
       }
   }, [mode, learnPhase, camera, controls, setOrbitEnabled]);
@@ -388,7 +453,7 @@ export const RubiksCube = () => {
         return;
     }
 
-    if (mode !== 'GAME' || animationRef.current) return;
+    if (mode === 'HERO' || animationRef.current) return;
     e.stopPropagation();
     if (controls) {
         // @ts-ignore
@@ -433,7 +498,7 @@ export const RubiksCube = () => {
             setDragStart(null);
             enableOrbit();
         }
-        if (!dragStart && mode === 'GAME' && controls) {
+        if (!dragStart && mode !== 'HERO' && controls) {
              // @ts-ignore
             if (!controls.enabled) controls.enabled = true;
         }
@@ -444,7 +509,7 @@ export const RubiksCube = () => {
 
   const handlePointerMove = (e: any) => {
     if (mode === 'LEARN' && learnPhase === 'INPUT') return;
-    if (!dragStart || mode !== 'GAME' || animationRef.current) return;
+    if (!dragStart || mode === 'HERO' || animationRef.current) return;
     e.stopPropagation();
     const currentPos = new THREE.Vector2(e.clientX, e.clientY);
     const delta = new THREE.Vector2().subVectors(currentPos, dragStart.pos);

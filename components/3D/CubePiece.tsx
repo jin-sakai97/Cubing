@@ -26,8 +26,10 @@ const CubePiece: React.FC<CubePieceProps> = ({ initialColors, id, paintedColors 
          const isVisibleFace = initialHex !== '#000000';
          
          let color: string;
-         if (mode === 'LEARN' && learnPhase === 'INPUT') {
+         if (mode === 'LEARN') {
              if (isVisibleFace) {
+                 // In Tutorial mode, we should show the painted state if available.
+                 // If not painted, use gray.
                  color = paintedHex || '#404040';
              } else {
                  color = '#000000';

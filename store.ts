@@ -47,7 +47,8 @@ interface AppState {
   // Learn Mode State
   learnPhase: LearnPhase;
   tutorialSteps: TutorialStep[];
-  currentStepIndex: number;
+  currentPhaseIndex: number;
+  currentMoveIndex: number; // Index within the current phase's algorithm
   cubeStateString: string | null;
 
   // Painting State
@@ -66,10 +67,13 @@ interface AppState {
   // Learn Mode Actions
   setLearnPhase: (phase: LearnPhase) => void;
   setTutorialSteps: (steps: TutorialStep[]) => void;
-  setCurrentStepIndex: (index: number) => void;
+  setCurrentPhaseIndex: (index: number) => void;
+  setCurrentMoveIndex: (index: number) => void;
   setCubeStateString: (state: string | null) => void;
-  nextStep: () => void;
-  prevStep: () => void;
+  
+  // Granular Navigation
+  nextTutorialMove: () => void;
+  prevTutorialMove: () => void;
 
   // Painting Actions
   setSelectedColor: (color: SelectedColor | null) => void;
@@ -87,7 +91,7 @@ interface AppState {
   resetGame: () => void;
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>((set, get) => ({
   mode: 'HERO',
   theme: 'TECH',
   isSolved: false,
@@ -104,7 +108,8 @@ export const useStore = create<AppState>((set) => ({
   // Learn Mode Initial State
   learnPhase: 'INPUT',
   tutorialSteps: [],
-  currentStepIndex: 0,
+  currentPhaseIndex: 0,
+  currentMoveIndex: -1, // -1 means no move highlighted yet (start of phase)
   cubeStateString: null,
 
   // Painting Initial State
@@ -122,17 +127,61 @@ export const useStore = create<AppState>((set) => ({
   
   // Learn Mode Setters
   setLearnPhase: (learnPhase) => set({ learnPhase }),
-  setTutorialSteps: (tutorialSteps) => set({ tutorialSteps, currentStepIndex: 0 }),
-  setCurrentStepIndex: (currentStepIndex) => set({ currentStepIndex }),
+  setTutorialSteps: (tutorialSteps) => set({ 
+      tutorialSteps, 
+      currentPhaseIndex: 0, 
+      currentMoveIndex: -1 
+  }),
+  setCurrentPhaseIndex: (currentPhaseIndex) => set({ currentPhaseIndex, currentMoveIndex: -1 }),
+  setCurrentMoveIndex: (currentMoveIndex) => set({ currentMoveIndex }),
   setCubeStateString: (cubeStateString) => set({ cubeStateString }),
-  nextStep: () => set((state) => ({ currentStepIndex: Math.min(state.currentStepIndex + 1, state.tutorialSteps.length - 1) })),
-  prevStep: () => set((state) => ({ currentStepIndex: Math.max(state.currentStepIndex - 1, 0) })),
+
+  nextTutorialMove: () => set((state) => {
+      const currentPhase = state.tutorialSteps[state.currentPhaseIndex];
+      if (!currentPhase) return {};
+      
+      const moves = currentPhase.algorithm.split(' ').filter(m => m.length > 0);
+      
+      if (state.currentMoveIndex < moves.length - 1) {
+          return { currentMoveIndex: state.currentMoveIndex + 1 };
+      } else if (state.currentPhaseIndex < state.tutorialSteps.length - 1) {
+          return { 
+              currentPhaseIndex: state.currentPhaseIndex + 1,
+              currentMoveIndex: 0
+          };
+      }
+      return {};
+  }),
+
+  prevTutorialMove: () => set((state) => {
+      if (state.currentMoveIndex > 0) {
+          return { currentMoveIndex: state.currentMoveIndex - 1 };
+      } else if (state.currentPhaseIndex > 0) {
+          const prevPhase = state.tutorialSteps[state.currentPhaseIndex - 1];
+          const prevMoves = prevPhase.algorithm.split(' ').filter(m => m.length > 0);
+          return {
+              currentPhaseIndex: state.currentPhaseIndex - 1,
+              currentMoveIndex: prevMoves.length - 1
+          };
+      } else if (state.currentMoveIndex === 0) {
+          return { currentMoveIndex: -1 };
+      }
+      return {};
+  }),
 
   // Painting Setters
   setSelectedColor: (selectedColor) => set({ selectedColor }),
   initializePaintingState: () => set(() => {
       // Centers identified by position in INITIAL_POSITIONS
-      // (x+1)*9 + (y+1)*3 + (z+1)
+      // Using standard BOY scheme: White-Up, Yellow-Down, Green-Front, Blue-Back, Red-Right, Orange-Left
+      // Indices (frozen INITIAL_POSITIONS):
+      // 14: (0,0,1) -> Front -> Green (#009E60)
+      // 12: (0,0,-1) -> Back -> Blue (#0051BA)
+      // 16: (0,1,0) -> Up -> White (#FFFFFF)
+      // 10: (0,-1,0) -> Down -> Yellow (#FFD500)
+      // 22: (1,0,0) -> Right -> Red (#C41E3A)
+      // 4: (-1,0,0) -> Left -> Orange (#FF5800)
+      
       const paintedStickers: Record<string, string> = {
           '14-front': '#009E60',
           '12-back': '#0051BA',

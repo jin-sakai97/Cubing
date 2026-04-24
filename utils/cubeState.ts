@@ -30,9 +30,8 @@ export const getCubeStateString = (pieces: any[]) => {
 
     const state: string[] = new Array(54).fill(' ');
 
-    // 2. Map color to letter (case insensitive for this solver usually)
-    // Front: 'f', Right: 'r', Up: 'u', Down: 'd', Left: 'l', Back: 'b'
-    // Based on center pieces which define the face
+    // 2. Map color to letter
+    // Standard BOY Scheme: U:White, D:Yellow, F:Green, B:Blue, R:Red, L:Orange
     const colorToFace: Record<string, string> = {};
     
     // Find center pieces to define which color is which face
@@ -42,12 +41,12 @@ export const getCubeStateString = (pieces: any[]) => {
         const nonZero = [pos.x, pos.y, pos.z].filter(v => Math.abs(v) > 0.1).length;
         if (nonZero === 1) {
             // This is a center piece. Check which face it is on.
-            if (Math.abs(pos.z - 1) < 0.1) colorToFace[p.colors.front] = 'f';
-            if (Math.abs(pos.x - 1) < 0.1) colorToFace[p.colors.right] = 'r';
             if (Math.abs(pos.y - 1) < 0.1) colorToFace[p.colors.up] = 'u';
             if (Math.abs(pos.y + 1) < 0.1) colorToFace[p.colors.down] = 'd';
-            if (Math.abs(pos.x + 1) < 0.1) colorToFace[p.colors.left] = 'l';
+            if (Math.abs(pos.z - 1) < 0.1) colorToFace[p.colors.front] = 'f';
             if (Math.abs(pos.z + 1) < 0.1) colorToFace[p.colors.back] = 'b';
+            if (Math.abs(pos.x - 1) < 0.1) colorToFace[p.colors.right] = 'r';
+            if (Math.abs(pos.x + 1) < 0.1) colorToFace[p.colors.left] = 'l';
         }
     });
 
@@ -63,14 +62,6 @@ export const getCubeStateString = (pieces: any[]) => {
             return false;
         });
 
-        // Sort stickers in reading order for that face
-        // Front (Z=1): Y desc, X asc
-        // Right (X=1): Y desc, Z desc
-        // Up (Y=1): Z desc, X asc
-        // Down (Y=-1): Z asc, X asc
-        // Left (X=-1): Y desc, Z asc
-        // Back (Z=-1): Y desc, X desc
-        
         facePieces.sort((a, b) => {
             const pa = a.currentPos;
             const pb = b.currentPos;
@@ -99,14 +90,14 @@ export const getCubeStateString = (pieces: any[]) => {
 export const getCubeStateFromPainting = (paintedStickers: Record<string, string>) => {
     const state: string[] = new Array(54).fill('?');
 
-    // Mapping of hex colors to face keys
+    // Standard BOY Mapping (Uppercase for solver consistency)
     const hexToKey: Record<string, string> = {
-        '#009E60': 'f', // Green
-        '#C41E3A': 'r', // Red
-        '#FFFFFF': 'u', // White
-        '#FFD500': 'd', // Yellow
-        '#FF5800': 'l', // Orange
-        '#0051BA': 'b', // Blue
+        '#FFFFFF': 'u', // White -> Up
+        '#FFD500': 'd', // Yellow -> Down
+        '#009E60': 'f', // Green -> Front
+        '#0051BA': 'b', // Blue -> Back
+        '#C41E3A': 'r', // Red -> Right
+        '#FF5800': 'l', // Orange -> Left
     };
 
     const faces: FaceName[] = ['front', 'right', 'up', 'down', 'left', 'back'];
